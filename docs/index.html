@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RETRACTION ARCADE — How Ten Publishers Retract Research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a2e;
+    --green: #00ff41;
+    --magenta: #ff00ff;
+    --yellow: #ffe600;
+    --cyan: #00ffff;
+    --white: #e0e0ff;
+    --dim: #6a6a9a;
+    --gold: #ffd700;
+    --silver: #c0c0c0;
+    --bronze: #cd7f32;
+    --red: #ff3333;
+  }
+
+  html { font-size: 16px; }
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Scanline overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.12) 0px,
+      rgba(0,0,0,0.12) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .pixel { font-family: 'Press Start 2P', cursive; }
+
+  /* ===== SCREENS ===== */
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.4s;
+    z-index: 10;
+  }
+  .screen.hidden { opacity: 0; pointer-events: none; z-index: -1; }
+
+  /* ===== TITLE SCREEN ===== */
+  #title-screen {
+    text-align: center;
+    padding: 1rem;
+  }
+
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  @keyframes glow-cycle {
+    0%, 100% { text-shadow: 0 0 10px var(--cyan), 0 0 20px var(--cyan), 0 0 40px var(--cyan); }
+    33% { text-shadow: 0 0 10px var(--magenta), 0 0 20px var(--magenta), 0 0 40px var(--magenta); }
+    66% { text-shadow: 0 0 10px var(--yellow), 0 0 20px var(--yellow), 0 0 40px var(--yellow); }
+  }
+
+  #title-screen .title {
+    font-size: clamp(1.8rem, 5vw, 3.2rem);
+    color: var(--cyan);
+    text-shadow: 0 0 10px var(--cyan), 0 0 20px var(--cyan), 0 0 40px var(--cyan), 0 0 80px rgba(0,255,255,0.3);
+    line-height: 1.5;
+    margin-bottom: 1.2rem;
+  }
+
+  #title-screen .subtitle {
+    font-size: clamp(0.6rem, 1.8vw, 0.85rem);
+    color: var(--magenta);
+    text-shadow: 0 0 8px var(--magenta);
+    margin-bottom: 0.6rem;
+    line-height: 2;
+  }
+
+  #title-screen .author {
+    font-size: clamp(0.5rem, 1.2vw, 0.65rem);
+    color: var(--dim);
+    margin-bottom: 2rem;
+  }
+
+  #title-screen .invader-preview {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    animation: float 2s ease-in-out infinite;
+  }
+
+  #title-screen .start-btn {
+    font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+    color: var(--green);
+    animation: blink 1s step-end infinite;
+    cursor: pointer;
+    border: none;
+    background: none;
+    letter-spacing: 2px;
+    padding: 1rem;
+  }
+  #title-screen .start-btn:hover { color: var(--yellow); }
+
+  #title-screen .controls-hint {
+    font-size: clamp(0.45rem, 1vw, 0.55rem);
+    color: var(--dim);
+    margin-top: 1.5rem;
+    line-height: 2.2;
+  }
+
+  /* ===== GAME SCREEN ===== */
+  #game-screen {
+    justify-content: flex-start;
+    padding: 0;
+  }
+
+  .game-hud {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    font-size: clamp(0.5rem, 1.2vw, 0.65rem);
+    z-index: 20;
+    background: rgba(10,10,46,0.9);
+    border-bottom: 2px solid rgba(0,255,255,0.2);
+  }
+
+  .hud-score { color: var(--cyan); }
+  .hud-round { color: var(--yellow); }
+  .hud-lives { color: var(--red); }
+  .hud-findings { color: var(--magenta); }
+
+  #game-canvas {
+    display: block;
+    image-rendering: pixelated;
+  }
+
+  /* ===== FINDING SCREEN ===== */
+  #finding-screen {
+    text-align: center;
+    padding: 1.5rem;
+  }
+
+  .finding-unlocked {
+    font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+    color: var(--green);
+    margin-bottom: 1.5rem;
+    letter-spacing: 3px;
+  }
+
+  .finding-card {
+    border: 2px solid var(--magenta);
+    border-radius: 6px;
+    padding: 1.5rem 2rem;
+    margin: 0 auto 1.5rem;
+    max-width: 700px;
+    background: rgba(255,0,255,0.04);
+    box-shadow: 0 0 20px rgba(255,0,255,0.12);
+  }
+
+  .finding-icon { font-size: 2.5rem; margin-bottom: 0.8rem; }
+
+  .finding-title {
+    font-size: clamp(0.65rem, 1.5vw, 0.85rem);
+    color: var(--yellow);
+    text-shadow: 0 0 6px rgba(255,230,0,0.3);
+    margin-bottom: 0.8rem;
+    line-height: 1.8;
+  }
+
+  .finding-text {
+    color: var(--white);
+    font-size: clamp(0.85rem, 1.8vw, 1.05rem);
+    line-height: 1.8;
+    opacity: 0.9;
+    font-family: 'Courier New', Courier, monospace;
+  }
+
+  .finding-continue {
+    font-size: clamp(0.5rem, 1.2vw, 0.65rem);
+    color: var(--green);
+    animation: blink 1s step-end infinite;
+    cursor: pointer;
+    background: none;
+    border: 1px solid var(--green);
+    padding: 0.6rem 1.2rem;
+    margin-top: 0.5rem;
+    transition: all 0.2s;
+  }
+  .finding-continue:hover {
+    background: var(--green);
+    color: var(--bg);
+  }
+
+  /* ===== HIGH SCORE TABLE FINDING ===== */
+  .mini-scores {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: clamp(0.7rem, 1.4vw, 0.9rem);
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  .mini-scores th {
+    font-family: 'Press Start 2P', cursive;
+    font-size: clamp(0.4rem, 0.9vw, 0.55rem);
+    color: var(--cyan);
+    text-align: left;
+    padding: 0.3rem 0.5rem 0.6rem;
+    border-bottom: 1px solid var(--cyan);
+  }
+  .mini-scores th:last-child { text-align: right; }
+  .mini-scores td {
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .mini-scores td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .mini-scores .r1 td { color: var(--gold); }
+  .mini-scores .r2 td { color: var(--silver); }
+  .mini-scores .r3 td { color: var(--bronze); }
+
+  /* ===== GAME OVER / VICTORY SCREEN ===== */
+  #end-screen {
+    text-align: center;
+    padding: 1.5rem;
+  }
+
+  .end-title {
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+  }
+
+  .end-title.victory {
+    color: var(--gold);
+    text-shadow: 0 0 10px var(--gold), 0 0 20px var(--gold), 0 0 40px rgba(255,215,0,0.3);
+  }
+  .end-title.defeat {
+    color: var(--red);
+    text-shadow: 0 0 10px rgba(255,51,51,0.5), 0 0 20px rgba(255,51,51,0.3);
+  }
+
+  .end-stats {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .end-stat {
+    text-align: center;
+  }
+  .end-stat-val {
+    font-size: clamp(1rem, 2.5vw, 1.5rem);
+    color: var(--cyan);
+    text-shadow: 0 0 8px rgba(0,255,255,0.4);
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+  .end-stat-label {
+    font-size: clamp(0.4rem, 0.9vw, 0.5rem);
+    color: var(--dim);
+  }
+
+  .findings-gallery {
+    max-width: 700px;
+    margin: 1.5rem auto;
+    text-align: left;
+  }
+
+  .findings-gallery h3 {
+    font-size: clamp(0.55rem, 1.2vw, 0.7rem);
+    color: var(--yellow);
+    text-align: center;
+    margin-bottom: 1rem;
+    letter-spacing: 2px;
+  }
+
+  .gallery-item {
+    display: flex;
+    gap: 0.8rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    align-items: center;
+  }
+
+  .gallery-icon { font-size: 1.3rem; flex-shrink: 0; }
+  .gallery-title {
+    font-family: 'Press Start 2P', cursive;
+    font-size: clamp(0.4rem, 0.8vw, 0.5rem);
+    color: var(--magenta);
+  }
+  .gallery-text {
+    font-size: clamp(0.7rem, 1.2vw, 0.85rem);
+    color: var(--white);
+    opacity: 0.8;
+    line-height: 1.6;
+  }
+
+  .gallery-locked {
+    opacity: 0.3;
+  }
+  .gallery-locked .gallery-title { color: var(--dim); }
+  .gallery-locked .gallery-text { color: var(--dim); }
+
+  .end-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+
+  .end-btn {
+    font-family: 'Press Start 2P', cursive;
+    font-size: clamp(0.5rem, 1vw, 0.6rem);
+    cursor: pointer;
+    background: none;
+    border: 1px solid var(--green);
+    color: var(--green);
+    padding: 0.6rem 1.2rem;
+    transition: all 0.2s;
+  }
+  .end-btn:hover {
+    background: var(--green);
+    color: var(--bg);
+  }
+
+  .end-credits {
+    font-size: 0.75rem;
+    color: var(--dim);
+    margin-top: 1.5rem;
+    line-height: 2;
+  }
+  .end-credits a { color: var(--dim); }
+
+  /* ===== MOBILE CONTROLS ===== */
+  .mobile-controls {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 0.5rem;
+    background: rgba(10,10,46,0.95);
+    border-top: 2px solid rgba(0,255,255,0.2);
+  }
+
+  .mobile-controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .mobile-btn {
+    font-family: 'Press Start 2P', cursive;
+    font-size: 1.2rem;
+    color: var(--cyan);
+    background: rgba(0,255,255,0.08);
+    border: 2px solid rgba(0,255,255,0.3);
+    border-radius: 8px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+  }
+  .mobile-btn:active {
+    background: rgba(0,255,255,0.2);
+    border-color: var(--cyan);
+  }
+
+  .mobile-btn-fire {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    font-size: 0.6rem;
+    color: var(--red);
+    border-color: rgba(255,51,51,0.4);
+    background: rgba(255,51,51,0.08);
+  }
+  .mobile-btn-fire:active {
+    background: rgba(255,51,51,0.25);
+    border-color: var(--red);
+  }
+
+  @media (pointer: coarse) {
+    .mobile-controls { display: block; }
+    .controls-hint { display: none !important; }
+  }
+
+  @media (max-width: 600px) {
+    .game-hud { font-size: 0.45rem; padding: 0.4rem 0.6rem; }
+  }
+
+  /* ===== SCROLLABLE END SCREEN ===== */
+  #end-screen {
+    overflow-y: auto;
+    justify-content: flex-start;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== TITLE SCREEN ===== -->
+<div id="title-screen" class="screen">
+  <div class="invader-preview">&#128125; &#128125; &#128125;</div>
+  <h1 class="pixel title">RETRACTION<br>ARCADE</h1>
+  <p class="pixel subtitle">How Ten Publishers Retract Research</p>
+  <p class="pixel author">Jonas Oppenlaender &middot; University of Oulu</p>
+  <button class="pixel start-btn" id="start-btn">&#9654; INSERT COIN &#9664;</button>
+  <div class="pixel controls-hint">
+    &#8592; &#8594; MOVE &nbsp;&bull;&nbsp; SPACE FIRE<br>
+    CLEAR EACH WAVE TO UNLOCK FINDINGS
+  </div>
+</div>
+
+<!-- ===== GAME SCREEN ===== -->
+<div id="game-screen" class="screen hidden">
+  <div class="game-hud">
+    <span class="pixel hud-score">SCORE: <span id="hud-score-val">0</span></span>
+    <span class="pixel hud-round">ROUND <span id="hud-round-val">1</span>/8</span>
+    <span class="pixel hud-lives" id="hud-lives">&#9829; &#9829; &#9829;</span>
+    <span class="pixel hud-findings">FINDINGS: <span id="hud-findings-val">0</span>/8</span>
+  </div>
+  <canvas id="game-canvas"></canvas>
+
+  <div class="mobile-controls">
+    <div class="mobile-controls-row">
+      <button class="mobile-btn" id="btn-left">&#9664;</button>
+      <button class="mobile-btn mobile-btn-fire" id="btn-fire">FIRE</button>
+      <button class="mobile-btn" id="btn-right">&#9654;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FINDING SCREEN ===== -->
+<div id="finding-screen" class="screen hidden">
+  <p class="pixel finding-unlocked">&#9733; FINDING UNLOCKED &#9733;</p>
+  <div class="finding-card">
+    <div class="finding-icon" id="finding-icon"></div>
+    <p class="pixel finding-title" id="finding-title"></p>
+    <div class="finding-text" id="finding-text"></div>
+  </div>
+  <button class="pixel finding-continue" id="finding-continue">NEXT ROUND &#9654;</button>
+</div>
+
+<!-- ===== END SCREEN ===== -->
+<div id="end-screen" class="screen hidden">
+  <p class="pixel end-title" id="end-title"></p>
+  <div class="end-stats" id="end-stats"></div>
+  <div class="findings-gallery" id="findings-gallery"></div>
+  <div class="end-actions">
+    <button class="end-btn" id="play-again-btn">PLAY AGAIN</button>
+    <a href="#" class="end-btn" id="paper-link-btn">&#128196; READ THE PAPER</a>
+  </div>
+  <div class="end-credits">
+    <p>Jonas Oppenlaender / University of Oulu / 2026</p>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// RETRACTION ARCADE — The Game
+// ============================================================
+
+const FINDINGS = [
+  {
+    icon: '📊',
+    title: '"THE LEADERBOARD"',
+    text: `<table class="mini-scores">
+      <tr><th>RANK</th><th>PUBLISHER</th><th>RATE</th></tr>
+      <tr class="r1"><td>1.</td><td>Hindawi</td><td>320.02</td></tr>
+      <tr class="r2"><td>2.</td><td>IOS Press</td><td>283.77</td></tr>
+      <tr class="r3"><td>3.</td><td>PLoS</td><td>26.82</td></tr>
+      <tr><td>4.</td><td>IEEE</td><td>17.70</td></tr>
+      <tr><td>5.</td><td>Springer Nature</td><td>9.06</td></tr>
+      <tr><td>6.</td><td>Taylor & Francis</td><td>6.50</td></tr>
+      <tr><td>7.</td><td>Wiley</td><td>6.21</td></tr>
+      <tr><td>8.</td><td>ACM</td><td>5.65</td></tr>
+      <tr><td>9.</td><td>SAGE</td><td>5.46</td></tr>
+      <tr><td>10.</td><td>Elsevier</td><td>3.97</td></tr>
+    </table>
+    <p style="text-align:center;font-family:'Press Start 2P',cursive;font-size:0.5rem;color:var(--dim);margin-top:0.6rem;">RETRACTIONS PER 10,000 PUBLICATIONS</p>`,
+  },
+  {
+    icon: '🔥',
+    title: '"23 YEARS CLEAN"',
+    text: `ACM's first retraction dates to 2020, despite a catalog dating to 1997. Twenty-three years of publishing with zero retractions on record.`,
+  },
+  {
+    icon: '⚠️',
+    title: '"ONE-TRICK PONY"',
+    text: `98.3% of ACM's 354 retractions trace to a single incident: Compromised Peer Review. Virtually every other retraction reason is absent.`,
+  },
+  {
+    icon: '👁️',
+    title: '"7 MISSING REASONS"',
+    text: `Seven of the ten most common global retraction reasons — including misconduct, plagiarism, and data concerns — are entirely absent from ACM's record.`,
+  },
+  {
+    icon: '⚡',
+    title: '"SPEED RUN"',
+    text: `Median retraction lag ranges from 41 days (IEEE) to 1,568 days (PLoS). A 38-fold range across publishers.`,
+  },
+  {
+    icon: '🌐',
+    title: '"4X COMBO"',
+    text: `China-affiliated authors account for 52.54% of retractions across these ten publishers but approximately 16.5% of global publications.`,
+  },
+  {
+    icon: '🔒',
+    title: '"DARK ARCHIVE"',
+    text: `ACM maintains a non-public dark archive of removed works. Unlike retractions, these removals leave no public trace and prevent independent verification.`,
+  },
+  {
+    icon: '🏛️',
+    title: '"THE BIG PICTURE"',
+    text: `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-top:0.3rem;">
+      <div style="text-align:center;border:1px solid rgba(0,255,255,0.2);border-radius:4px;padding:0.8rem 0.4rem;">
+        <span class="pixel" style="font-size:clamp(0.8rem,2vw,1.2rem);color:var(--cyan);text-shadow:0 0 8px rgba(0,255,255,0.4);">46,087</span><br>
+        <span class="pixel" style="font-size:0.45rem;color:var(--dim);">RETRACTIONS</span>
+      </div>
+      <div style="text-align:center;border:1px solid rgba(0,255,255,0.2);border-radius:4px;padding:0.8rem 0.4rem;">
+        <span class="pixel" style="font-size:clamp(0.8rem,2vw,1.2rem);color:var(--cyan);text-shadow:0 0 8px rgba(0,255,255,0.4);">10</span><br>
+        <span class="pixel" style="font-size:0.45rem;color:var(--dim);">PUBLISHERS</span>
+      </div>
+      <div style="text-align:center;border:1px solid rgba(0,255,255,0.2);border-radius:4px;padding:0.8rem 0.4rem;">
+        <span class="pixel" style="font-size:clamp(0.8rem,2vw,1.2rem);color:var(--cyan);text-shadow:0 0 8px rgba(0,255,255,0.4);">1997–2026</span><br>
+        <span class="pixel" style="font-size:0.45rem;color:var(--dim);">TIME SPAN</span>
+      </div>
+      <div style="text-align:center;border:1px solid rgba(0,255,255,0.2);border-radius:4px;padding:0.8rem 0.4rem;">
+        <span class="pixel" style="font-size:clamp(0.8rem,2vw,1.2rem);color:var(--cyan);text-shadow:0 0 8px rgba(0,255,255,0.4);">148,508</span><br>
+        <span class="pixel" style="font-size:0.45rem;color:var(--dim);">UNIQUE AUTHORS</span>
+      </div>
+    </div>`,
+  },
+];
+
+// Publisher labels used as invader text
+const PUBLISHERS = ['HIN','IOS','PLO','IEE','SPN','T&F','WIL','ACM','SAG','ELS'];
+
+// ===== Game State =====
+const G = {
+  screen: 'title',
+  score: 0,
+  lives: 3,
+  round: 1,
+  findingsUnlocked: 0,
+  paused: false,
+
+  // Player
+  px: 0, py: 0, pw: 48, ph: 24, pSpeed: 320,
+
+  // Bullets
+  bullets: [],
+  bulletSpeed: 500,
+  bulletCooldown: 0,
+  bulletInterval: 0.25,
+
+  // Invaders
+  invaders: [],
+  invaderW: 44, invaderH: 26,
+  invaderDx: 60, invaderDy: 0,
+  invaderSpeed: 0, invaderDropTarget: 0,
+  invaderDropping: false,
+  invaderDir: 1,
+  invaderShootTimer: 0,
+  invaderBullets: [],
+  invaderBulletSpeed: 220,
+
+  // Particles
+  particles: [],
+
+  // Stars
+  stars: [],
+
+  // Canvas
+  cw: 0, ch: 0,
+
+  // Input
+  keys: {},
+  touchLeft: false, touchRight: false, touchFire: false,
+
+  // Timing
+  lastTime: 0,
+  roundStartTimer: 0,
+  roundStarting: false,
+
+  // Game-over flag
+  gameOver: false,
+};
+
+// ===== DOM refs =====
+const $ = id => document.getElementById(id);
+const canvas = $('game-canvas');
+const ctx = canvas.getContext('2d');
+
+// ===== Screen management =====
+function showScreen(name) {
+  G.screen = name;
+  ['title-screen','game-screen','finding-screen','end-screen'].forEach(id => {
+    const el = $(id);
+    if (id === name + '-screen') el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  });
+}
+
+// ===== Resize =====
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  let w = window.innerWidth;
+  let h = window.innerHeight;
+  // Account for HUD height (~40px) and mobile controls (~80px)
+  const hudH = 40;
+  const mobileH = ('ontouchstart' in window) ? 80 : 0;
+  const gameH = h - hudH - mobileH;
+
+  canvas.style.width = w + 'px';
+  canvas.style.height = gameH + 'px';
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(gameH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  G.cw = w;
+  G.ch = gameH;
+
+  // Reposition player
+  G.py = G.ch - 40;
+  if (G.px === 0) G.px = G.cw / 2;
+}
+
+// ===== Stars =====
+function initStars() {
+  G.stars = [];
+  for (let i = 0; i < 80; i++) {
+    G.stars.push({
+      x: Math.random() * G.cw,
+      y: Math.random() * G.ch,
+      size: Math.random() * 1.5 + 0.5,
+      alpha: Math.random() * 0.5 + 0.1,
+      twinkle: Math.random() * 3,
+    });
+  }
+}
+
+// ===== Spawn invader wave =====
+function spawnWave(round) {
+  G.invaders = [];
+  G.invaderBullets = [];
+  G.invaderDropping = false;
+  G.invaderShootTimer = 0;
+
+  const cols = Math.min(5 + round, 10);
+  const rows = Math.min(2 + Math.floor(round / 2), 5);
+  const spacing = 56;
+  const vspacing = 38;
+  const totalW = cols * spacing;
+  const startX = (G.cw - totalW) / 2 + spacing / 2;
+  const startY = 40;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const pubIndex = (r * cols + c) % PUBLISHERS.length;
+      G.invaders.push({
+        x: startX + c * spacing,
+        y: startY + r * vspacing,
+        w: G.invaderW,
+        h: G.invaderH,
+        alive: true,
+        label: PUBLISHERS[pubIndex],
+        row: r,
+        hp: r === 0 && round > 4 ? 2 : 1, // Top row gets 2 HP in later rounds
+        flash: 0,
+      });
+    }
+  }
+
+  G.invaderSpeed = 30 + round * 12;
+  G.invaderDir = 1;
+}
+
+// ===== Particles =====
+function spawnExplosion(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 120 + 40;
+    G.particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.4 + Math.random() * 0.4,
+      maxLife: 0.4 + Math.random() * 0.4,
+      color,
+      size: Math.random() * 3 + 1,
+    });
+  }
+}
+
+// ===== Start round =====
+function startRound() {
+  spawnWave(G.round);
+  G.bullets = [];
+  G.bulletCooldown = 0;
+  G.roundStarting = true;
+  G.roundStartTimer = 1.5;
+  $('hud-round-val').textContent = G.round;
+}
+
+// ===== Start game =====
+function startGame() {
+  G.score = 0;
+  G.lives = 3;
+  G.round = 1;
+  G.findingsUnlocked = 0;
+  G.gameOver = false;
+  G.particles = [];
+  G.px = G.cw / 2;
+  G.py = G.ch - 40;
+  updateHUD();
+  showScreen('game');
+  startRound();
+  G.lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+}
+
+// ===== HUD =====
+function updateHUD() {
+  $('hud-score-val').textContent = G.score;
+  $('hud-round-val').textContent = G.round;
+  $('hud-findings-val').textContent = G.findingsUnlocked;
+  let hearts = '';
+  for (let i = 0; i < G.lives; i++) hearts += '♥ ';
+  for (let i = G.lives; i < 3; i++) hearts += '♡ ';
+  $('hud-lives').innerHTML = hearts;
+}
+
+// ===== Game loop =====
+function gameLoop(now) {
+  if (G.screen !== 'game') return;
+
+  const dt = Math.min((now - G.lastTime) / 1000, 0.05);
+  G.lastTime = now;
+
+  update(dt);
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// ===== Update =====
+function update(dt) {
+  // Round start countdown
+  if (G.roundStarting) {
+    G.roundStartTimer -= dt;
+    if (G.roundStartTimer <= 0) G.roundStarting = false;
+    return;
+  }
+
+  // Player movement
+  const moveLeft = G.keys['ArrowLeft'] || G.keys['a'] || G.keys['A'] || G.touchLeft;
+  const moveRight = G.keys['ArrowRight'] || G.keys['d'] || G.keys['D'] || G.touchRight;
+  const firing = G.keys[' '] || G.keys['ArrowUp'] || G.touchFire;
+
+  if (moveLeft) G.px -= G.pSpeed * dt;
+  if (moveRight) G.px += G.pSpeed * dt;
+  G.px = Math.max(G.pw / 2, Math.min(G.cw - G.pw / 2, G.px));
+
+  // Player shooting
+  G.bulletCooldown -= dt;
+  if (firing && G.bulletCooldown <= 0) {
+    G.bullets.push({ x: G.px, y: G.py - G.ph / 2, w: 3, h: 10 });
+    G.bulletCooldown = G.bulletInterval;
+  }
+
+  // Update player bullets
+  for (let i = G.bullets.length - 1; i >= 0; i--) {
+    G.bullets[i].y -= G.bulletSpeed * dt;
+    if (G.bullets[i].y < -10) { G.bullets.splice(i, 1); continue; }
+
+    // Check collision with invaders
+    const b = G.bullets[i];
+    if (!b) continue;
+    for (const inv of G.invaders) {
+      if (!inv.alive) continue;
+      if (b.x > inv.x - inv.w/2 && b.x < inv.x + inv.w/2 &&
+          b.y > inv.y - inv.h/2 && b.y < inv.y + inv.h/2) {
+        inv.hp--;
+        inv.flash = 0.1;
+        if (inv.hp <= 0) {
+          inv.alive = false;
+          G.score += 10 * G.round;
+          spawnExplosion(inv.x, inv.y, '#ff00ff', 12);
+        } else {
+          spawnExplosion(b.x, b.y, '#ffe600', 5);
+        }
+        G.bullets.splice(i, 1);
+        updateHUD();
+        break;
+      }
+    }
+  }
+
+  // Move invaders
+  const aliveInvaders = G.invaders.filter(inv => inv.alive);
+  if (aliveInvaders.length === 0) {
+    // Round cleared
+    roundCleared();
+    return;
+  }
+
+  // Check bounds
+  let minX = Infinity, maxX = -Infinity;
+  for (const inv of aliveInvaders) {
+    minX = Math.min(minX, inv.x - inv.w / 2);
+    maxX = Math.max(maxX, inv.x + inv.w / 2);
+  }
+
+  const edgeMargin = 10;
+  if ((G.invaderDir === 1 && maxX >= G.cw - edgeMargin) ||
+      (G.invaderDir === -1 && minX <= edgeMargin)) {
+    G.invaderDir *= -1;
+    for (const inv of aliveInvaders) inv.y += 16;
+  }
+
+  for (const inv of aliveInvaders) {
+    inv.x += G.invaderSpeed * G.invaderDir * dt;
+    if (inv.flash > 0) inv.flash -= dt;
+
+    // Check if invader reached player level
+    if (inv.y + inv.h / 2 >= G.py) {
+      playerHit();
+      return;
+    }
+  }
+
+  // Invader shooting
+  G.invaderShootTimer -= dt;
+  if (G.invaderShootTimer <= 0 && aliveInvaders.length > 0) {
+    const shootInterval = Math.max(0.6, 2.0 - G.round * 0.15);
+    G.invaderShootTimer = shootInterval + Math.random() * 0.5;
+
+    // Pick a random bottom-row invader to shoot
+    const cols = {};
+    for (const inv of aliveInvaders) {
+      const col = Math.round(inv.x / 10);
+      if (!cols[col] || inv.y > cols[col].y) cols[col] = inv;
+    }
+    const shooters = Object.values(cols);
+    const shooter = shooters[Math.floor(Math.random() * shooters.length)];
+    if (shooter) {
+      G.invaderBullets.push({ x: shooter.x, y: shooter.y + shooter.h / 2, w: 3, h: 10 });
+    }
+  }
+
+  // Update invader bullets
+  const ibSpeed = G.invaderBulletSpeed + G.round * 15;
+  for (let i = G.invaderBullets.length - 1; i >= 0; i--) {
+    G.invaderBullets[i].y += ibSpeed * dt;
+    if (G.invaderBullets[i].y > G.ch + 10) { G.invaderBullets.splice(i, 1); continue; }
+
+    const ib = G.invaderBullets[i];
+    if (!ib) continue;
+    // Check collision with player
+    if (ib.x > G.px - G.pw/2 && ib.x < G.px + G.pw/2 &&
+        ib.y > G.py - G.ph/2 && ib.y < G.py + G.ph/2) {
+      G.invaderBullets.splice(i, 1);
+      playerHit();
+      return;
+    }
+  }
+
+  // Update particles
+  for (let i = G.particles.length - 1; i >= 0; i--) {
+    const p = G.particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    if (p.life <= 0) G.particles.splice(i, 1);
+  }
+
+  // Twinkle stars
+  for (const s of G.stars) {
+    s.twinkle += dt * 2;
+  }
+}
+
+function playerHit() {
+  G.lives--;
+  spawnExplosion(G.px, G.py, '#ff3333', 20);
+  updateHUD();
+  if (G.lives <= 0) {
+    endGame(false);
+  } else {
+    // Reset position and clear enemy bullets
+    G.px = G.cw / 2;
+    G.invaderBullets = [];
+    G.bulletCooldown = 0.5;
+    G.roundStarting = true;
+    G.roundStartTimer = 1.0;
+  }
+}
+
+function roundCleared() {
+  // Unlock finding
+  G.findingsUnlocked = G.round;
+  updateHUD();
+
+  if (G.round >= 8) {
+    endGame(true);
+    return;
+  }
+
+  // Show finding
+  showFinding(G.round - 1);
+}
+
+function showFinding(index) {
+  const f = FINDINGS[index];
+  $('finding-icon').textContent = f.icon;
+  $('finding-title').textContent = f.title;
+  $('finding-text').innerHTML = f.text;
+
+  if (G.round >= 8) {
+    $('finding-continue').textContent = 'VIEW RESULTS ▶';
+  } else {
+    $('finding-continue').textContent = 'NEXT ROUND ▶';
+  }
+
+  showScreen('finding');
+}
+
+function continueAfterFinding() {
+  if (G.round >= 8) {
+    endGame(true);
+    return;
+  }
+  G.round++;
+  showScreen('game');
+  startRound();
+  G.lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+}
+
+function endGame(victory) {
+  G.gameOver = true;
+
+  const titleEl = $('end-title');
+  if (victory) {
+    titleEl.textContent = 'ALL FINDINGS UNLOCKED!';
+    titleEl.className = 'pixel end-title victory';
+  } else {
+    titleEl.textContent = 'GAME OVER';
+    titleEl.className = 'pixel end-title defeat';
+  }
+
+  // Stats
+  $('end-stats').innerHTML = `
+    <div class="end-stat">
+      <span class="pixel end-stat-val">${G.score}</span>
+      <span class="pixel end-stat-label">SCORE</span>
+    </div>
+    <div class="end-stat">
+      <span class="pixel end-stat-val">${G.round > 8 ? 8 : G.round}/${8}</span>
+      <span class="pixel end-stat-label">ROUNDS</span>
+    </div>
+    <div class="end-stat">
+      <span class="pixel end-stat-val">${G.findingsUnlocked}/${FINDINGS.length}</span>
+      <span class="pixel end-stat-label">FINDINGS</span>
+    </div>
+  `;
+
+  // Gallery
+  let html = '<h3>RESEARCH FINDINGS</h3>';
+  for (let i = 0; i < FINDINGS.length; i++) {
+    const f = FINDINGS[i];
+    const unlocked = i < G.findingsUnlocked;
+    html += `<div class="gallery-item ${unlocked ? '' : 'gallery-locked'}">
+      <div class="gallery-icon">${unlocked ? f.icon : '🔒'}</div>
+      <div>
+        <p class="gallery-title">${unlocked ? f.title : '???'}</p>
+        <p class="gallery-text">${unlocked ? (f.text.includes('<table') ? 'Retraction rates for 10 publishers — Hindawi leads at 320.02 per 10k.' : f.text.replace(/<[^>]+>/g, '')) : 'Clear round ' + (i+1) + ' to unlock'}</p>
+      </div>
+    </div>`;
+  }
+  $('findings-gallery').innerHTML = html;
+
+  showScreen('end');
+}
+
+// ===== Draw =====
+function draw() {
+  ctx.clearRect(0, 0, G.cw, G.ch);
+
+  // Background
+  ctx.fillStyle = '#0a0a2e';
+  ctx.fillRect(0, 0, G.cw, G.ch);
+
+  // Stars
+  for (const s of G.stars) {
+    const a = s.alpha * (0.5 + 0.5 * Math.sin(s.twinkle));
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(s.x, s.y, s.size, s.size);
+  }
+  ctx.globalAlpha = 1;
+
+  // Round start overlay
+  if (G.roundStarting) {
+    ctx.fillStyle = 'rgba(10,10,46,0.6)';
+    ctx.fillRect(0, 0, G.cw, G.ch);
+    ctx.font = '700 clamp(14px, 3vw, 24px) "Press Start 2P", cursive';
+    ctx.fillStyle = '#ffe600';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#ffe600';
+    ctx.shadowBlur = 15;
+    ctx.fillText(`ROUND ${G.round}`, G.cw / 2, G.ch / 2 - 10);
+    ctx.font = '700 clamp(8px, 1.5vw, 12px) "Press Start 2P", cursive';
+    ctx.fillStyle = '#6a6a9a';
+    ctx.shadowBlur = 0;
+    const publisherForRound = ['Hindawi','IOS Press','PLoS','IEEE','Springer Nature','Taylor & Francis','Wiley','ACM'];
+    ctx.fillText(`Wave: ${publisherForRound[G.round - 1] || 'ALL'}`, G.cw / 2, G.ch / 2 + 20);
+    ctx.textAlign = 'left';
+    ctx.shadowBlur = 0;
+
+    // Still draw invaders and player during countdown
+    drawInvaders();
+    drawPlayer();
+    drawParticles();
+    return;
+  }
+
+  // Invaders
+  drawInvaders();
+
+  // Player bullets
+  ctx.fillStyle = '#00ff41';
+  ctx.shadowColor = '#00ff41';
+  ctx.shadowBlur = 8;
+  for (const b of G.bullets) {
+    ctx.fillRect(b.x - b.w/2, b.y - b.h/2, b.w, b.h);
+  }
+
+  // Invader bullets
+  ctx.fillStyle = '#ff3333';
+  ctx.shadowColor = '#ff3333';
+  ctx.shadowBlur = 8;
+  for (const ib of G.invaderBullets) {
+    ctx.fillRect(ib.x - ib.w/2, ib.y - ib.h/2, ib.w, ib.h);
+  }
+  ctx.shadowBlur = 0;
+
+  // Player
+  drawPlayer();
+
+  // Particles
+  drawParticles();
+}
+
+function drawInvaders() {
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (const inv of G.invaders) {
+    if (!inv.alive) continue;
+
+    // Color by row
+    const colors = ['#ff00ff', '#ffe600', '#00ffff', '#00ff41', '#ff6633'];
+    const color = colors[inv.row % colors.length];
+
+    if (inv.flash > 0) {
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#ffffff';
+    } else {
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+    }
+    ctx.shadowBlur = 6;
+
+    // Draw invader body (blocky alien shape)
+    const x = inv.x, y = inv.y, w = inv.w, h = inv.h;
+    ctx.fillRect(x - w*0.4, y - h*0.4, w*0.8, h*0.6);
+    ctx.fillRect(x - w*0.5, y - h*0.2, w, h*0.3);
+    // Antennae
+    ctx.fillRect(x - w*0.35, y - h*0.5, 3, h*0.15);
+    ctx.fillRect(x + w*0.32, y - h*0.5, 3, h*0.15);
+    // Legs
+    ctx.fillRect(x - w*0.45, y + h*0.15, 4, h*0.3);
+    ctx.fillRect(x + w*0.41, y + h*0.15, 4, h*0.3);
+    // Eyes
+    ctx.fillStyle = '#0a0a2e';
+    ctx.shadowBlur = 0;
+    ctx.fillRect(x - 6, y - h*0.15, 4, 4);
+    ctx.fillRect(x + 3, y - h*0.15, 4, 4);
+
+    // Label
+    ctx.font = '700 7px "Press Start 2P", cursive';
+    ctx.fillStyle = '#0a0a2e';
+    ctx.fillText(inv.label, x, y + 3);
+  }
+  ctx.shadowBlur = 0;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawPlayer() {
+  const x = G.px, y = G.py;
+
+  // Ship body
+  ctx.fillStyle = '#00ffff';
+  ctx.shadowColor = '#00ffff';
+  ctx.shadowBlur = 10;
+
+  // Main hull
+  ctx.beginPath();
+  ctx.moveTo(x, y - 14);        // Nose
+  ctx.lineTo(x + 20, y + 10);   // Right wing
+  ctx.lineTo(x + 8, y + 6);
+  ctx.lineTo(x + 8, y + 12);
+  ctx.lineTo(x - 8, y + 12);
+  ctx.lineTo(x - 8, y + 6);
+  ctx.lineTo(x - 20, y + 10);   // Left wing
+  ctx.closePath();
+  ctx.fill();
+
+  // Cockpit
+  ctx.fillStyle = '#0a0a2e';
+  ctx.shadowBlur = 0;
+  ctx.fillRect(x - 3, y - 4, 6, 6);
+
+  // Engine glow
+  ctx.fillStyle = '#ff6633';
+  ctx.shadowColor = '#ff6633';
+  ctx.shadowBlur = 8;
+  ctx.fillRect(x - 4, y + 10, 3, 4 + Math.random() * 4);
+  ctx.fillRect(x + 1, y + 10, 3, 4 + Math.random() * 4);
+  ctx.shadowBlur = 0;
+}
+
+function drawParticles() {
+  for (const p of G.particles) {
+    const alpha = p.life / p.maxLife;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 4;
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+}
+
+// ===== Input =====
+document.addEventListener('keydown', e => {
+  G.keys[e.key] = true;
+  if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault();
+});
+document.addEventListener('keyup', e => {
+  G.keys[e.key] = false;
+});
+
+// Mobile controls
+function setupMobileBtn(id, pressKey) {
+  const el = $(id);
+  if (!el) return;
+
+  const start = () => {
+    if (pressKey === 'left') G.touchLeft = true;
+    else if (pressKey === 'right') G.touchRight = true;
+    else if (pressKey === 'fire') G.touchFire = true;
+  };
+  const end = () => {
+    if (pressKey === 'left') G.touchLeft = false;
+    else if (pressKey === 'right') G.touchRight = false;
+    else if (pressKey === 'fire') G.touchFire = false;
+  };
+
+  el.addEventListener('touchstart', e => { e.preventDefault(); start(); });
+  el.addEventListener('touchend', e => { e.preventDefault(); end(); });
+  el.addEventListener('touchcancel', e => { end(); });
+  el.addEventListener('mousedown', e => { e.preventDefault(); start(); });
+  el.addEventListener('mouseup', e => { end(); });
+  el.addEventListener('mouseleave', e => { end(); });
+}
+
+setupMobileBtn('btn-left', 'left');
+setupMobileBtn('btn-right', 'right');
+setupMobileBtn('btn-fire', 'fire');
+
+// ===== Button handlers =====
+$('start-btn').addEventListener('click', () => {
+  resize();
+  initStars();
+  startGame();
+});
+
+// Also start on any key press from title
+document.addEventListener('keydown', e => {
+  if (G.screen === 'title' && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault();
+    resize();
+    initStars();
+    startGame();
+  }
+});
+
+$('finding-continue').addEventListener('click', continueAfterFinding);
+document.addEventListener('keydown', e => {
+  if (G.screen === 'finding' && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault();
+    continueAfterFinding();
+  }
+});
+
+$('play-again-btn').addEventListener('click', () => {
+  showScreen('title');
+});
+
+// ===== Window resize =====
+window.addEventListener('resize', () => {
+  if (G.screen === 'game') resize();
+});
+
+// Initial sizing
+resize();
+initStars();
+</script>
+</body>
+</html>
